@@ -108,17 +108,16 @@ class Imager {
         $h = $data[1];									// height
         $crop = isset($data[2]) ? $data[2] : false;		// use crop
 
+        $ratio = (isset( $data[3] ) && $data[3] === true ) ? "&aspect_ratio=" . round($w/$h,3,PHP_ROUND_HALF_UP) : false;
         // get the focal point
         $focal = $crop ? FocalPoint::sanitize_focal_point( get_post_meta( $attachment_id, 'focal_point', true ) ) : false;
         
         if ($focal) {
-
             $focal_x_p = intval($focal[0] * 100);
             $focal_y_p = intval($focal[1] * 100);
-
-            $crop_func = "func=crop&w={$w}&h={$h}&gravity={$focal_x_p}p,{$focal_y_p}p";
+            $crop_func = "func=crop&w={$w}&h={$h}&gravity={$focal_x_p}p,{$focal_y_p}p{$ratio}";
         } else {
-            $crop_func = $crop ? "func=crop&width={$w}&height={$h}" : "func=bound&width={$w}&height={$h}";
+            $crop_func = $crop ? "func=crop&width={$w}&height={$h}" : "func=bound&width={$w}{$ratio}";//"func=bound&width={$w}&height={$h}";
         }
 
         $breakpoint_image = $image_url . "?{$crop_func}";
