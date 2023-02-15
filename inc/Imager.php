@@ -17,7 +17,7 @@ class Imager {
      * @param  mixed $attr
      * @return void
      */
-    public static function get_attachment_picture( $attachment_id , $breakpoints = null , $attr = array() , $max_full ) {
+    public static function get_attachment_picture( $attachment_id , $breakpoints = null , $attr = array() , $max_full = null ) {
 
 		// let the hooks handle this
 		return apply_filters( 'perfect_get_attachment_picture', $html, $attachment_id, $breakpoints, $attr , $max_full );
@@ -71,16 +71,15 @@ class Imager {
         if ( is_array($max_full) && count($max_full) >= 2 ) {
 
             $max_image = self::get_image_url( $attachment_id , $max_full );
-
             $attr = array_merge( array( 'width' => $max_full[0] , 'height' => $max_full[1] ) , $attr );
         } else {
-            $max_image = $image_url;
+            $max_image = self::get_image_url($attachment_id);
             $attr = array_merge( array( 'width' => $width , 'height' => $height ) , $attr );
         }
 
         $html .= "<source media=\"(min-width:". ($last_breakpoint + 1) . "px)\" srcset=\"{$max_image}\">";
 
-        $full_image = self::get_image_url( $attachment_id);
+        $full_image = self::get_image_url($attachment_id);
 
         $html .= "<img src=\"{$full_image}\"";
 		foreach( $attr as $name => $value ){
@@ -108,7 +107,11 @@ class Imager {
         $h = $data[1];									// height
         $crop = isset($data[2]) ? $data[2] : false;		// use crop
 
+        // set ratio to resize ratio
         $ratio = (isset( $data[3] ) && $data[3] === true ) ? "&aspect_ratio=" . round($w/$h,3,PHP_ROUND_HALF_UP) : false;
+        // if a fractical ratio has been given, use that
+        $ratio = ($ratio === false && isset( $data[3] ) && is_numeric($data[3]) ) ? "&aspect_ratio=" . round($data[3],3,PHP_ROUND_HALF_UP) : $ratio;
+        
         // get the focal point
         $focal = $crop ? FocalPoint::sanitize_focal_point( get_post_meta( $attachment_id, 'focal_point', true ) ) : false;
         
