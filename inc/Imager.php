@@ -7,6 +7,12 @@ class Imager {
 
     public function __construct() {
         add_filter( 'perfect_get_attachment_picture' , __CLASS__ . '::get_imager' , 10 , 5 );
+
+        // replace attachement urls
+        add_filter( 'wp_get_attachment_url', __CLASS__ . '::attachment_url' , 10, 1 );
+        // Replace srcset paths
+        add_filter('wp_calculate_image_srcset', __CLASS__ . '::image_srcset' , 10, 1 );
+
     }
     
     /**
@@ -111,7 +117,7 @@ class Imager {
         $ratio = (isset( $data[3] ) && $data[3] === true ) ? "&aspect_ratio=" . round($w/$h,3,PHP_ROUND_HALF_UP) : false;
         // if a fractical ratio has been given, use that
         $ratio = ($ratio === false && isset( $data[3] ) && is_numeric($data[3]) ) ? "&aspect_ratio=" . round($data[3],3,PHP_ROUND_HALF_UP) : $ratio;
-        
+
         // get the focal point
         $focal = $crop ? FocalPoint::sanitize_focal_point( get_post_meta( $attachment_id, 'focal_point', true ) ) : false;
         
@@ -128,4 +134,40 @@ class Imager {
         
         return $breakpoint_image;
     }
+
+    /**
+     * attachment_url
+     * 
+     * replace url with cloudimage.io path
+     *
+     * @param  mixed $url
+     * @return void
+     */
+    public static function attachment_url($url) {
+        if (is_admin()) return $url;
+        if (file_exists($url)) {
+            return $url;
+        }
+        return apply_filters( 'perfect_image_sizes/imageurl' , $url );
+    }
+
+        
+    /**
+     * image_srcset
+     * 
+     * replace srcset for <img> tags
+     *
+     * @param  mixed $sources
+     * @return void
+     */
+    public static function image_srcset($sources) {
+        if (is_admin()) return $sources;
+        foreach($sources as &$source) {
+            if(!file_exists($source['url'])) 
+            {
+                $source['url'] = apply_filters( 'perfect_image_sizes/imageurl' ,  $source['url']);
+            }
+        }
+        return $sources;
+    }    
 }
