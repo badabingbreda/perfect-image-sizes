@@ -98,7 +98,14 @@ class Imager {
         return $html;
 
     }
-
+    
+    /**
+     * get_image_url
+     *
+     * @param  mixed $attachment_id
+     * @param  mixed $data
+     * @return void
+     */
     private static function get_image_url( $attachment_id , $data = [] ) {  
         
         // get full image source url
