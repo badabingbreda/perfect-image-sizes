@@ -118,22 +118,35 @@ class Imager {
         
         $w = $data[0];									// width
         $h = $data[1];									// height
-        $crop = isset($data[2]) ? $data[2] : false;		// use crop
+        $crop = isset($data[2]) ? $data[2] : false;		// use crop: true/false/'width'/'height'
 
         // set ratio to resize ratio
         $ratio = (isset( $data[3] ) && $data[3] === true ) ? "&aspect_ratio=" . round($w/$h,3,PHP_ROUND_HALF_UP) : false;
         // if a fractical ratio has been given, use that
         $ratio = ($ratio === false && isset( $data[3] ) && is_numeric($data[3]) ) ? "&aspect_ratio=" . round($data[3],3,PHP_ROUND_HALF_UP) : $ratio;
 
-        // get the focal point
+        $gravity = "";
+        // get the focal point if crop is to be used
         $focal = $crop ? FocalPoint::sanitize_focal_point( get_post_meta( $attachment_id, 'focal_point', true ) ) : false;
-        
+
+        // add gravity point if focal has been set
         if ($focal) {
             $focal_x_p = intval($focal[0] * 100);
             $focal_y_p = intval($focal[1] * 100);
-            $crop_func = "func=crop&w={$w}&h={$h}&gravity={$focal_x_p}p,{$focal_y_p}p{$ratio}";
+            $gravity = "&gravity={$focal_x_p}p,{$focal_y_p}p";
+        }
+        
+        /* determine the crop setting: 
+         * if true, crop both width and height
+         * if false or 'width', resize to fit to width (no matter the height)
+         * if 'height', resize to max height (no matter the width)
+         */
+        if ($crop === true) {
+            $crop_func = "func=crop&width={$w}&height={$h}{$gravity}{$ratio}";
+        } else if ( $crop === 'height' ) {
+            $crop_func = "height={$h}{$gravity}{$ratio}";
         } else {
-            $crop_func = $crop ? "func=crop&width={$w}&height={$h}" : "func=bound&width={$w}{$ratio}";//"func=bound&width={$w}&height={$h}";
+            $crop_func = "width={$w}{$gravity}{$ratio}";
         }
 
         $breakpoint_image = $image_url . "?{$crop_func}";
