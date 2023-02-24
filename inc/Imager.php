@@ -6,12 +6,16 @@ use PerfectImageSizes\FocalPoint;
 class Imager {
 
     public function __construct() {
-        add_filter( 'perfect_get_attachment_picture' , __CLASS__ . '::get_imager' , 10 , 5 );
+        add_filter( 'perfect_get_attachment_picture' , __CLASS__ . '::get_imager' , 10 , 6 );
 
         // replace attachement urls
         add_filter( 'wp_get_attachment_url', __CLASS__ . '::attachment_url' , 10, 1 );
         // Replace srcset paths
         add_filter('wp_calculate_image_srcset', __CLASS__ . '::image_srcset' , 10, 1 );
+
+        // filter to replace any missed images
+        // try to make sure this refers to <img src=""> only
+        add_filter( 'the_content' , __CLASS__ . '::regex_perfect_image_sizes' , 10 , 1 );
 
     }
     
@@ -23,10 +27,10 @@ class Imager {
      * @param  mixed $attr
      * @return void
      */
-    public static function get_attachment_picture( $attachment_id , $breakpoints = null , $attr = array() , $max_full = null ) {
+    public static function get_attachment_picture( $attachment_id , $breakpoints = null , $attr = array() , $max_full = null , $identifier = null ) {
 
 		// let the hooks handle this
-		return apply_filters( 'perfect_get_attachment_picture', $html, $attachment_id, $breakpoints, $attr , $max_full );
+		return apply_filters( 'perfect_get_attachment_picture', $html, $attachment_id, $breakpoints, $attr , $max_full , $identifier );
     }
     
     /**
@@ -38,7 +42,7 @@ class Imager {
      * @param  mixed $attr
      * @return void
      */
-    public static function get_imager( $html , $attachment_id , $breakpoints , $attr , $max_full ) {
+    public static function get_imager( $html , $attachment_id , $breakpoints , $attr , $max_full , $identifier ) {
 
         if( $attachment_id < 1 || !is_array( $breakpoints ) || count( $breakpoints ) === 0 ){
 			return $html;
@@ -59,7 +63,7 @@ class Imager {
 
 			if( intval( $breakpoint ) && count( $data ) >= 2 ){
 				
-                $breakpoint_image = self::get_image_url( $attachment_id , $data );
+                $breakpoint_image = self::get_image_url( $attachment_id , $data , $breakpoint , $identifier );
 
                 if (!$breakpoint_image) continue;
 
@@ -76,16 +80,16 @@ class Imager {
         // if max full size has been given
         if ( is_array($max_full) && count($max_full) >= 2 ) {
 
-            $max_image = self::get_image_url( $attachment_id , $max_full );
+            $max_image = self::get_image_url( $attachment_id , $max_full , 'max_full' , $identifier );
             $attr = array_merge( array( 'width' => $max_full[0] , 'height' => $max_full[1] ) , $attr );
         } else {
-            $max_image = self::get_image_url($attachment_id);
+            $max_image = self::get_image_url($attachment_id , null , 'original' , $identifier );
             $attr = array_merge( array( 'width' => $width , 'height' => $height ) , $attr );
         }
 
         $html .= "<source media=\"(min-width:". ($last_breakpoint + 1) . "px)\" srcset=\"{$max_image}\">";
 
-        $full_image = self::get_image_url($attachment_id);
+        $full_image = self::get_image_url($attachment_id , null , 'original' , $identifier );
 
         $html .= "<img src=\"{$full_image}\"";
 		foreach( $attr as $name => $value ){
@@ -106,7 +110,9 @@ class Imager {
      * @param  mixed $data
      * @return void
      */
-    private static function get_image_url( $attachment_id , $data = [] ) {  
+    private static function get_image_url( $attachment_id , $data = [] , $size = null , $identifier = null ) { 
+        
+        $images = [];
         
         // get full image source url
         $image_url = wp_get_attachment_image_url( $attachment_id, 'full', false );
@@ -135,7 +141,53 @@ class Imager {
             $focal_y_p = intval($focal[1] * 100);
             $gravity = "&gravity={$focal_x_p}p,{$focal_y_p}p";
         }
-        
+
+        $crop_func = self::calc_crop_func( $crop , $w , $h , $gravity , $ratio );
+        $breakpoint_image = $image_url . "?{$crop_func}";
+        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+        $images[] = $breakpoint_image . ' 1x';
+
+        if (isset($data[4]) && is_array($data[4])) {
+
+            // get the metadata
+            $metadata = wp_get_attachment_metadata( $attachment_id );
+
+            foreach ($data[4] as $density) {
+                switch( $density ) {
+                    case '1.5x':
+                        if ($w*1.5 > $metadata['width'] || $h*1.5 > $metadata['height']) continue;
+                        $crop_func = self::calc_crop_func( $crop , $w*1.5 , $h*1.5 , $gravity , $ratio );
+                        $breakpoint_image = $image_url . "?{$crop_func}";
+                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+                        $images[] = $breakpoint_image . ' 1.5x';
+                    break;
+                    case '2x':
+                        if ($w*2 > $metadata['width'] || $h*2 > $metadata['height']) continue;
+                        $crop_func = self::calc_crop_func( $crop , $w*2 , $h*2 , $gravity , $ratio );
+                        $breakpoint_image = $image_url . "?{$crop_func}";
+                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+                        $images[] = $breakpoint_image . ' 2x';
+                    break;
+                    case '3x':
+                        if ($w*3 > $metadata['width'] || $h*3 > $metadata['height']) continue;
+                        $crop_func = self::calc_crop_func( $crop , $w*3 , $h*3 , $gravity , $ratio );
+                        $breakpoint_image = $image_url . "?{$crop_func}";
+                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+                        $images[] = $breakpoint_image . ' 3x';
+                    break;
+
+                }
+            }
+
+        } 
+
+        $images = apply_filters( 'perfect_image_sizes/imageurl/after' , $images , $attachment_id , $data , $size , $identifier );
+
+        return implode( ', ', $images );
+    }
+
+    public static function calc_crop_func( $crop , $w , $h , $gravity , $ratio ) {
+
         /* determine the crop setting: 
          * if true, crop both width and height
          * if false or 'width', resize to fit to width (no matter the height)
@@ -149,10 +201,7 @@ class Imager {
             $crop_func = "width={$w}{$gravity}{$ratio}";
         }
 
-        $breakpoint_image = $image_url . "?{$crop_func}";
-        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image );   
-        
-        return $breakpoint_image;
+        return $crop_func;
     }
 
     /**
@@ -169,6 +218,34 @@ class Imager {
             return $url;
         }
         return apply_filters( 'perfect_image_sizes/imageurl' , $url );
+    }
+    
+    /**
+     * regex_perfect_image_sizes
+     *
+     * @param  mixed $content
+     * @return void
+     */
+    public static function regex_perfect_image_sizes( $content ) {
+
+        if ( !apply_filters( 'perfect_image_sizes/the_content' , false ) ) return $content;
+
+        // use the uploads dir
+        $source = \wp_get_upload_dir()['baseurl'] . '/';
+        
+        // see if this matches and convert to destination
+        $destination = apply_filters( 'perfect_image_sizes/imageurl', $source );
+
+        // no need to regex if source and destination remain unchanged
+        if ( $source === $destination ) return $content;
+
+        $regex = [ "/" . preg_quote( $source , "/" ) . "(.*(.png|.gif|.jpg|.jpeg|.webp))/" ];
+        $replace = [ $destination . "$1" ];
+
+        $result = preg_replace( $regex , $replace , $content );
+
+        if ($result) return $result;
+        return $content;
     }
 
         
