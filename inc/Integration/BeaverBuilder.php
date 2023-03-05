@@ -15,7 +15,7 @@ class BeaverBuilder {
      * @param  mixed $rules
      * @return void
      */
-    function css_background_image_replace( $rules ) {
+    public static function css_background_image_replace( $rules ) {
     
         foreach ($rules as &$rule) {
             if (isset($rule['props']['background-image'])) {
@@ -32,7 +32,7 @@ class BeaverBuilder {
      * @param  mixed $row
      * @return void
      */
-    function node_background_image_replace( $attrs , $row ) {
+    public static function node_background_image_replace( $attrs , $row ) {
     
         if (isset($attrs['data-parallax-image'])) {
             $attrs['data-parallax-image'] = apply_filters( 'perfect_image_sizes/imageurl' , $attrs['data-parallax-image'] );

@@ -2,8 +2,12 @@
 namespace PerfectImageSizes;
 
 use PerfectImageSizes\FocalPoint;
+use PerfectImageSizes\Integration\CloudImage;
+use PerfectImageSizes\Integration\TwicPics;
 
 class Imager {
+
+    private static $imager;
 
     public function __construct() {
         add_filter( 'perfect_get_attachment_picture' , __CLASS__ . '::get_imager' , 10 , 6 );
@@ -16,6 +20,19 @@ class Imager {
         // filter to replace any missed images
         // try to make sure this refers to <img src=""> only
         add_filter( 'the_content' , __CLASS__ . '::regex_perfect_image_sizes' , 10 , 1 );
+
+        $use_imager = apply_filters( 'perfect_image_sizes/imager' , 'twicpics' );
+
+        switch( $use_imager ) {
+            case "twicpics":
+                self::$imager = new TwicPics();
+            break;
+            default:
+            case "cloudimage":
+                self::$imager = new CloudImage();
+            break;
+
+        }
 
     }
     
@@ -43,6 +60,8 @@ class Imager {
      * @return void
      */
     public static function get_imager( $html , $attachment_id , $breakpoints , $attr , $max_full , $identifier ) {
+
+        $imager = self::$imager;
 
         if( $attachment_id < 1 || !is_array( $breakpoints ) || count( $breakpoints ) === 0 ){
 			return $html;
@@ -92,9 +111,7 @@ class Imager {
         $full_image = self::get_image_url($attachment_id , null , 'original' , $identifier );
 
         $html .= "<img src=\"{$full_image}\"";
-		foreach( $attr as $name => $value ){
-			$html .= " {$name}=\"{$value}\"";
-		}
+        $html .= $imager::img_attr($attr,$attachment_id);
 		$html .= ' />';		
 
         $html .= "</picture>";
@@ -111,7 +128,9 @@ class Imager {
      * @return void
      */
     private static function get_image_url( $attachment_id , $data = [] , $size = null , $identifier = null ) { 
-        
+
+        $imager = self::$imager;
+
         $images = [];
         
         // get full image source url
@@ -127,9 +146,9 @@ class Imager {
         $crop = isset($data[2]) ? $data[2] : false;		// use crop: true/false/'width'/'height'
 
         // set ratio to resize ratio
-        $ratio = (isset( $data[3] ) && $data[3] === true ) ? "&aspect_ratio=" . round($w/$h,3,PHP_ROUND_HALF_UP) : false;
+        $ratio = (isset( $data[3] ) && $data[3] === true ) ? $imager::ratio($w,$h) : false;
         // if a fractical ratio has been given, use that
-        $ratio = ($ratio === false && isset( $data[3] ) && is_numeric($data[3]) ) ? "&aspect_ratio=" . round($data[3],3,PHP_ROUND_HALF_UP) : $ratio;
+        $ratio = ($ratio === false && isset( $data[3] ) && is_numeric($data[3]) ) ? $imager::ratio($data[3] * 100 , 100) : $ratio;
 
         $gravity = "";
         // get the focal point if crop is to be used
@@ -139,11 +158,11 @@ class Imager {
         if ($focal) {
             $focal_x_p = intval($focal[0] * 100);
             $focal_y_p = intval($focal[1] * 100);
-            $gravity = "&gravity={$focal_x_p}p,{$focal_y_p}p";
+            $gravity = $imager::gravity($focal_x_p,$focal_y_p);
         }
 
-        $crop_func = self::calc_crop_func( $crop , $w , $h , $gravity , $ratio );
-        $breakpoint_image = $image_url . "?{$crop_func}";
+        $crop_func = $imager::calc_crop_func( $crop , $w , $h , $gravity , $ratio );
+        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
         $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
         $images[] = $breakpoint_image . ' 1x';
 
@@ -155,23 +174,23 @@ class Imager {
             foreach ($data[4] as $density) {
                 switch( $density ) {
                     case '1.5x':
-                        if ($w*1.5 > $metadata['width'] || $h*1.5 > $metadata['height']) continue;
-                        $crop_func = self::calc_crop_func( $crop , $w*1.5 , $h*1.5 , $gravity , $ratio );
-                        $breakpoint_image = $image_url . "?{$crop_func}";
+                        if ($w*1.5 > $metadata['width'] || $h*1.5 > $metadata['height']) break;
+                        $crop_func = $imager::calc_crop_func( $crop , $w*1.5 , $h*1.5 , $gravity , $ratio );
+                        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
                         $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
                         $images[] = $breakpoint_image . ' 1.5x';
                     break;
                     case '2x':
-                        if ($w*2 > $metadata['width'] || $h*2 > $metadata['height']) continue;
-                        $crop_func = self::calc_crop_func( $crop , $w*2 , $h*2 , $gravity , $ratio );
-                        $breakpoint_image = $image_url . "?{$crop_func}";
+                        if ($w*2 > $metadata['width'] || $h*2 > $metadata['height']) break;
+                        $crop_func = $imager::calc_crop_func( $crop , $w*2 , $h*2 , $gravity , $ratio );
+                        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
                         $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
                         $images[] = $breakpoint_image . ' 2x';
                     break;
                     case '3x':
-                        if ($w*3 > $metadata['width'] || $h*3 > $metadata['height']) continue;
-                        $crop_func = self::calc_crop_func( $crop , $w*3 , $h*3 , $gravity , $ratio );
-                        $breakpoint_image = $image_url . "?{$crop_func}";
+                        if ($w*3 > $metadata['width'] || $h*3 > $metadata['height']) break;
+                        $crop_func = $imager::calc_crop_func( $crop , $w*3 , $h*3 , $gravity , $ratio );
+                        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
                         $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
                         $images[] = $breakpoint_image . ' 3x';
                     break;
@@ -184,24 +203,6 @@ class Imager {
         $images = apply_filters( 'perfect_image_sizes/imageurl/after' , $images , $attachment_id , $data , $size , $identifier );
 
         return implode( ', ', $images );
-    }
-
-    public static function calc_crop_func( $crop , $w , $h , $gravity , $ratio ) {
-
-        /* determine the crop setting: 
-         * if true, crop both width and height
-         * if false or 'width', resize to fit to width (no matter the height)
-         * if 'height', resize to max height (no matter the width)
-         */
-        if ($crop === true) {
-            $crop_func = "func=crop&width={$w}&height={$h}{$gravity}{$ratio}";
-        } else if ( $crop === 'height' ) {
-            $crop_func = "height={$h}{$gravity}{$ratio}";
-        } else {
-            $crop_func = "width={$w}{$gravity}{$ratio}";
-        }
-
-        return $crop_func;
     }
 
     /**
