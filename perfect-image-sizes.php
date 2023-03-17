@@ -2,7 +2,7 @@
 /*
 	Plugin Name: Perfect Image Sizes
 	Description: Perfect image sizes
-	Version: 1.1.0
+	Version: 1.2.1
 	Author: Badabing
 	Text Domain: perfect-image-sizes
 	Domain Path: /languages
@@ -25,7 +25,7 @@ if ( defined( 'ABSPATH' ) && ! defined( 'PERFECTIMAGESIZES_VERION' ) ) {
 		}
 	}
 	
-	define( 'PERFECTIMAGESIZES_VERSION'   , '1.1.0' );
+	define( 'PERFECTIMAGESIZES_VERSION'   , '1.2.1' );
 	define( 'PERFECTIMAGESIZES_DIR'     , plugin_dir_path( __FILE__ ) );
 	define( 'PERFECTIMAGESIZES_FILE'    , __FILE__ );
 	define( 'PERFECTIMAGESIZES_URL'     , plugins_url( '/', __FILE__ ) );

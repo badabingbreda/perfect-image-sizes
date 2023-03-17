@@ -10,6 +10,9 @@ class Imager {
     private static $imager;
 
     public function __construct() {
+        // maybe change the imager on plugins loaded
+        add_action( 'plugins_loaded' , __CLASS__ . '::plugins_loaded' );
+        
         add_filter( 'perfect_get_attachment_picture' , __CLASS__ . '::get_imager' , 10 , 6 );
 
         // replace attachement urls
@@ -21,8 +24,20 @@ class Imager {
         // try to make sure this refers to <img src=""> only
         add_filter( 'the_content' , __CLASS__ . '::regex_perfect_image_sizes' , 10 , 1 );
 
+        
+    }
+        
+    /**
+     * plugins_loaded
+     * 
+     * 
+     *
+     * @return void
+     */
+    public static function plugins_loaded() {
+        
         $use_imager = apply_filters( 'perfect_image_sizes/imager' , 'twicpics' );
-
+    
         switch( $use_imager ) {
             case "twicpics":
                 self::$imager = new TwicPics();
@@ -31,9 +46,8 @@ class Imager {
             case "cloudimage":
                 self::$imager = new CloudImage();
             break;
-
+    
         }
-
     }
     
     /**
