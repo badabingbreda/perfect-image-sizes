@@ -166,7 +166,7 @@ class Imager {
 
         $gravity = "";
         // get the focal point if crop is to be used
-        $focal = $crop ? FocalPoint::sanitize_focal_point( get_post_meta( $attachment_id, 'focal_point', true ) ) : false;
+        $focal = FocalPoint::sanitize_focal_point( get_post_meta( $attachment_id, 'focal_point', true ) );
 
         // add gravity point if focal has been set
         if ($focal) {
