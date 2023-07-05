@@ -83,7 +83,7 @@ class PluginOptions {
     
     public static function remove_disabled_image_sizes( $sizes ){
         $pis_disabled_sizes = get_option( 'pis_disabled_sizes', array() );
-        foreach( $bis_disabled_sizes as $key => $value ){
+        foreach( $pis_disabled_sizes as $key => $value ){
             if( intval( $value ) ){
                 unset( $sizes[ $key ] );
             }

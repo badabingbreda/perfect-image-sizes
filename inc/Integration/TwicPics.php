@@ -60,8 +60,8 @@ class TwicPics {
      * @param  mixed $crop_func
      * @return void
      */
-    public static function breakpoint_image($image_url , $crop_func) {
-        return $image_url . "?twic=v1{$crop_func}";        
+    public static function breakpoint_image($image_url , $crop_func , $output = 'webp' ) {
+        return $image_url . "?twic=v1{$crop_func}/output=" . $output;        
     }
     
     /**

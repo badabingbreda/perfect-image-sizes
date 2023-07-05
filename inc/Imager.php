@@ -205,16 +205,8 @@ class Imager {
 
         $crop_func = $imager::calc_crop_func( $crop , $w , $h , $gravity , $ratio );
 
-        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-
-        // get pis full name
-        if ( self::$enable_cache ) {
-            $image = wp_get_attachment_metadata( $attachment_id );
-            $file_name = LocalStore::get_pis_full_name( basename( $image['file'] ) , [ 'w' => $w , 'h' => $h , 'crop' => $crop , 'gravity' => $gravity , 'ratio' => $ratio , 'retina' => false ] );
-            error_log( $file_name );
-        }
-
-        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
+        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , false );
+        
         $images[] = $breakpoint_image . ' 1x';
 
         if (isset($data[4]) && is_array($data[4])) {
@@ -227,22 +219,25 @@ class Imager {
                     case '1.5x':
                         if ($w*1.5 > $metadata['width'] || $h*1.5 > $metadata['height']) break;
                         $crop_func = $imager::calc_crop_func( $crop , $w*1.5 , $h*1.5 , $gravity , $ratio );
-                        $breakpoint_image = $imager::breakpoint_image( $image_url,$crop_func );
-                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
+                        // $breakpoint_image = $imager::breakpoint_image( $image_url,$crop_func );
+                        // $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
+                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , '1.5x' );
                         $images[] = $breakpoint_image . ' 1.5x';
                     break;
                     case '2x':
                         if ($w*2 > $metadata['width'] || $h*2 > $metadata['height']) break;
                         $crop_func = $imager::calc_crop_func( $crop , $w*2 , $h*2 , $gravity , $ratio );
-                        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
+                        // $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
+                        // $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
+                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , '2x' );
                         $images[] = $breakpoint_image . ' 2x';
                     break;
                     case '3x':
                         if ($w*3 > $metadata['width'] || $h*3 > $metadata['height']) break;
                         $crop_func = $imager::calc_crop_func( $crop , $w*3 , $h*3 , $gravity , $ratio );
-                        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
+                        // $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
+                        // $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
+                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , '3x' );
                         $images[] = $breakpoint_image . ' 3x';
                     break;
 
@@ -254,6 +249,74 @@ class Imager {
         $images = apply_filters( 'perfect_image_sizes/imageurl/after' , $images , $attachment_id , $data , $size , $identifier );
 
         return implode( ', ', $images );
+    }
+    
+    /**
+     * get_breakpoint_image
+     * 
+     * get the image url, taking into consideration if cache needs to be used
+     *
+     * @param  mixed $attachment_id
+     * @param  mixed $w
+     * @param  mixed $h
+     * @param  mixed $crop
+     * @param  mixed $focal_x_p
+     * @param  mixed $focal_y_p
+     * @param  mixed $ratio
+     * @param  mixed $crop_func
+     * @param  mixed $retina
+     * @return void
+     */
+    private static function get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , $retina = false ) {
+
+        $imager = self::$imager;
+
+        // get full image source url
+        $image_url = wp_get_attachment_image_url( $attachment_id, 'full', false );
+
+        // get pis full name
+        if ( self::$enable_cache ) {
+            // get the image metadata
+            $image = wp_get_attachment_metadata( $attachment_id );
+
+            // generate a filename that we will use to store this size
+            $file_name = LocalStore::get_pis_full_name( 
+                    basename( $image['file'] ) , 
+                    [ 
+                        'w' => $w , 
+                        'h' => $h , 
+                        'crop' => $crop , 
+                        'gravity' => (isset( $focal_x_p ) ? $focal_x_p . 'x' . $focal_y_p : false) , 
+                        'ratio' => $ratio , 
+                        'retina' => $retina 
+                        ] );
+
+            // now that we have a file_name and our breakpoint image,
+            // check to see if it already exists. If so, return the full url
+            // if not, download the breakpoint image, store under the $file_name and return the full url
+            $generated_file_name = LocalStore::$pis_dir . DIRECTORY_SEPARATOR . $file_name;
+            if ( file_exists( $generated_file_name ) ) {
+                $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
+            } else {
+                // generate the url that will get our optimized image
+                $breakpoint_image = $imager::breakpoint_image( $image_url, $crop_func , 'webp' );
+                $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
+
+                // download the optimized image and save to disk
+                LocalStore::download_image( $breakpoint_image , $generated_file_name );
+
+                // return the url
+                $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
+    
+            }
+            
+        } else {
+            $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func, 'webp');
+            $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
+        }
+
+        return $breakpoint_image;
+
     }
 
     /**

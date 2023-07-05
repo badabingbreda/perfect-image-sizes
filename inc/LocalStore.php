@@ -9,7 +9,7 @@ use PerfectImageSizes\Integration\TwicPics;
  */
 class LocalStore {
 
-    private static $pis_dir = '';
+    public static $pis_dir = '';
 
     public function __construct() {
 
@@ -62,6 +62,21 @@ class LocalStore {
             wp_mkdir_p( self::$pis_dir );
         }
     }
+    
+    /**
+     * get_pis_path
+     * 
+     * get the file, return as url
+     *
+     * @param  mixed $absolute_path
+     * @return void
+     */
+    public static function get_pis_path( $absolute_path = '' ){
+        $wp_upload_dir = wp_upload_dir();
+        $path = $wp_upload_dir['baseurl'] . str_replace( $wp_upload_dir['basedir'], '', $absolute_path );
+        return str_replace( DIRECTORY_SEPARATOR, '/', $path );
+    }
+
     
     /**
      * pis_dir_writable
@@ -130,7 +145,7 @@ class LocalStore {
                 }, $crop ) );
             }
         }
-        return $file_name_only . '-' . intval( $width ) . 'x' . intval( $height ) . $crop_extension . '.' . $file_extension;
+        return $file_name_only . '-' . intval( $width ) . 'x' . intval( $height ) . $crop_extension . '.webp';// . $file_extension;
     }
     
     /**
@@ -162,7 +177,26 @@ class LocalStore {
         $ratio = $s[ 'ratio' ] ? $s[ 'ratio' ] : 'f';
         $retina = $s[ 'retina' ] ? "@{$s['retina']}" : '';
 
-        return  "{$file_name_only}-{$s['w']}x{$s['h']}-c{$s['crop']}-g{$s['gravity']}-r{$ratio}{$retina}" ;
+        return  "{$file_name_only}-{$s['w']}x{$s['h']}-c{$s['crop']}-g{$s['gravity']}-r{$ratio}{$retina}.webp" ;
+    }
+    
+    /**
+     * download_image
+     *
+     * @param  mixed $image_url
+     * @param  mixed $dest_file_name
+     * @return void
+     */
+    public static function download_image( $image_url , $dest_file_name ) {
+        $ch = curl_init( $image_url );
+        $fp = fopen( $dest_file_name , 'wb' );
+        curl_setopt($ch, CURLOPT_FILE, $fp);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_exec($ch);
+        curl_close($ch);
+        fclose($fp);  
+        
+        return true;
     }
     
 
