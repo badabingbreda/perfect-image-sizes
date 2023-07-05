@@ -36,7 +36,22 @@ class Imager {
      */
     public static function plugins_loaded() {
         
-        $use_imager = apply_filters( 'perfect_image_sizes/imager' , 'twicpics' );
+        // try to get the settings from the options table, fallback to twicpics if none selected
+        $imager = get_option( 'pis_imager' , 'twicpics' );
+
+        // legact filter
+        $use_imager = apply_filters( 'perfect_image_sizes/imager' , $imager );
+
+        // set the imageurl replacement using our generic setting
+        $api_access_path = get_option( 'pis_api_access_path' , '' );
+
+        if ( $api_access_path ) {
+            add_filter( 'perfect_image_sizes/imageurl' , 
+            function( $alias ) use ( $api_access_path ) {
+                $uploads_dir = wp_upload_dir();
+                return str_replace( $uploads_dir[ 'baseurl' ] , $api_access_path ) ;
+            } , 10 , 1 ) ;
+        }
     
         switch( $use_imager ) {
             case "twicpics":

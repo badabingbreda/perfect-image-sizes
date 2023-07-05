@@ -1,9 +1,10 @@
 <?php
 /*
 	Plugin Name: Perfect Image Sizes
-	Description: Perfect image sizes
+	Description: Deliver perfectly sized images for every possible responsive media width using the picture element. Display small images on multiple column grids and bigger images on tablets, not the other way around! Restrict the maximum fallback size, allow retina image sizes and set the focal point of the image. Use your TwicPics or CloudImage account to deliver optimized images and cache locally.
 	Version: 1.2.2
 	Author: Badabing
+	Author URI: https://www.badabing.nl
 	Text Domain: perfect-image-sizes
 	Domain Path: /languages
 */
@@ -27,6 +28,7 @@ if ( defined( 'ABSPATH' ) && ! defined( 'PERFECTIMAGESIZES_VERION' ) ) {
 	
 	define( 'PERFECTIMAGESIZES_VERSION'   , '1.2.2' );
 	define( 'PERFECTIMAGESIZES_DIR'     , plugin_dir_path( __FILE__ ) );
+	define( 'PERFECTIMAGESIZES_BASE'     , plugin_basename( __FILE__ ) );
 	define( 'PERFECTIMAGESIZES_FILE'    , __FILE__ );
 	define( 'PERFECTIMAGESIZES_URL'     , plugins_url( '/', __FILE__ ) );
 	
