@@ -40,7 +40,7 @@ class PluginOptions {
      * @return void
      */
     public static function plugin_action_link( $links, $file ){
-        array_unshift( $links, '<a href="tools.php?page=' . PERFECTIMAGESIZES_BASE . '">' . __( 'Settings', 'perfect-image-sizes' ) . '</a>' );
+        array_unshift( $links, '<a href="options-general.php?page=' . PERFECTIMAGESIZES_BASE . '">' . __( 'Settings', 'perfect-image-sizes' ) . '</a>' );
         return $links;
     }
     

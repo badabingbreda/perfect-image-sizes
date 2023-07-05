@@ -115,7 +115,7 @@ class LocalStore {
      * @param  mixed $crop
      * @return void
      */
-    function get_pis_file_name( $file_name, $width, $height, $crop ){
+    public static function get_pis_file_name( $file_name, $width, $height, $crop ) {
         $file_name_only = pathinfo( $file_name, PATHINFO_FILENAME );
         $file_extension = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
         $crop_extension = '';
@@ -132,6 +132,39 @@ class LocalStore {
         }
         return $file_name_only . '-' . intval( $width ) . 'x' . intval( $height ) . $crop_extension . '.' . $file_extension;
     }
+    
+    /**
+     * get_pis_full_name
+     *
+     * @param  mixed $file_name
+     * @param  mixed $s
+     * @return void
+     */
+    public static function get_pis_full_name( $file_name , $s ) {
+
+        $s = wp_parse_args( 
+            $s, 
+            array(
+                'width' => 0,
+                'height' => 0,
+                'ratio' => false,
+                'retina' => false,
+                'crop' => false,
+                'gravity' => false,
+
+            ) 
+        );       
+
+        $file_name_only = pathinfo( $file_name, PATHINFO_FILENAME );
+        $file_extension = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
+        $crop_extension = '';
+
+        $ratio = $s[ 'ratio' ] ? $s[ 'ratio' ] : 'f';
+        $retina = $s[ 'retina' ] ? "@{$s['retina']}" : '';
+
+        return  "{$file_name_only}-{$s['w']}x{$s['h']}-c{$s['crop']}-g{$s['gravity']}-r{$ratio}{$retina}" ;
+    }
+    
 
     
     public static function media_row_action( $actions, $post ){

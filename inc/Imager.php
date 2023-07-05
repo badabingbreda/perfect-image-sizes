@@ -2,12 +2,15 @@
 namespace PerfectImageSizes;
 
 use PerfectImageSizes\FocalPoint;
+use PerfectImageSizes\LocalStore;
 use PerfectImageSizes\Integration\CloudImage;
 use PerfectImageSizes\Integration\TwicPics;
 
 class Imager {
 
     private static $imager;
+
+    private static $enable_cache = false;
 
     public function __construct() {
         // maybe change the imager on plugins loaded
@@ -47,12 +50,20 @@ class Imager {
 
         if ( $api_access_path ) {
             add_filter( 'perfect_image_sizes/imageurl' , 
-            function( $alias ) use ( $api_access_path ) {
+            function( $name ) use ( $api_access_path ) {
                 $uploads_dir = wp_upload_dir();
-                return str_replace( $uploads_dir[ 'baseurl' ] , $api_access_path ) ;
+                return str_replace( $uploads_dir[ 'baseurl' ] , $api_access_path , $name ) ;
             } , 10 , 1 ) ;
         }
-    
+
+
+        self::$enable_cache = get_option( 'pis_enable_cache' , false );
+
+        if ( self::$enable_cache ) {
+            // figure this out later
+
+        }
+
         switch( $use_imager ) {
             case "twicpics":
                 self::$imager = new TwicPics();
@@ -75,6 +86,7 @@ class Imager {
      */
     public static function get_attachment_picture( $attachment_id , $breakpoints = null , $attr = array() , $max_full = null , $identifier = null ) {
 
+        $html = '';
 		// let the hooks handle this
 		return apply_filters( 'perfect_get_attachment_picture', $html, $attachment_id, $breakpoints, $attr , $max_full , $identifier );
     }
@@ -122,7 +134,8 @@ class Imager {
 
         // get the metadata
         $metadata = wp_get_attachment_metadata( $attachment_id );
-        list( $width , $height ) = $metadata;
+        $width = $metadata['width'];
+        $height = $metadata[ 'height' ];
 
 
         // if max full size has been given
@@ -191,8 +204,17 @@ class Imager {
         }
 
         $crop_func = $imager::calc_crop_func( $crop , $w , $h , $gravity , $ratio );
+
         $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+
+        // get pis full name
+        if ( self::$enable_cache ) {
+            $image = wp_get_attachment_metadata( $attachment_id );
+            $file_name = LocalStore::get_pis_full_name( basename( $image['file'] ) , [ 'w' => $w , 'h' => $h , 'crop' => $crop , 'gravity' => $gravity , 'ratio' => $ratio , 'retina' => false ] );
+            error_log( $file_name );
+        }
+
+        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
         $images[] = $breakpoint_image . ' 1x';
 
         if (isset($data[4]) && is_array($data[4])) {
@@ -205,22 +227,22 @@ class Imager {
                     case '1.5x':
                         if ($w*1.5 > $metadata['width'] || $h*1.5 > $metadata['height']) break;
                         $crop_func = $imager::calc_crop_func( $crop , $w*1.5 , $h*1.5 , $gravity , $ratio );
-                        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+                        $breakpoint_image = $imager::breakpoint_image( $image_url,$crop_func );
+                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
                         $images[] = $breakpoint_image . ' 1.5x';
                     break;
                     case '2x':
                         if ($w*2 > $metadata['width'] || $h*2 > $metadata['height']) break;
                         $crop_func = $imager::calc_crop_func( $crop , $w*2 , $h*2 , $gravity , $ratio );
                         $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
                         $images[] = $breakpoint_image . ' 2x';
                     break;
                     case '3x':
                         if ($w*3 > $metadata['width'] || $h*3 > $metadata['height']) break;
                         $crop_func = $imager::calc_crop_func( $crop , $w*3 , $h*3 , $gravity , $ratio );
                         $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
                         $images[] = $breakpoint_image . ' 3x';
                     break;
 
@@ -292,7 +314,7 @@ class Imager {
         foreach($sources as &$source) {
             if(!file_exists($source['url'])) 
             {
-                $source['url'] = apply_filters( 'perfect_image_sizes/imageurl' ,  $source['url']);
+                $source['url'] = apply_filters( 'perfect_image_sizes/imageurl' ,  $source['url'] );
             }
         }
         return $sources;
