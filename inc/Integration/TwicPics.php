@@ -3,6 +3,25 @@ namespace PerfectImageSizes\Integration;
 use PerfectImageSizes\Imager;
 
 class TwicPics {
+
+    public function __construct() {
+
+        add_filter( 'perfect_image_sizes/breakpoint_image' , __CLASS__ . '::image_quality' , 10 , 1 );
+    }
+        
+    /**
+     * image_quality
+     *
+     * @param  mixed $image_url
+     * @return void
+     */
+    public static function image_quality( $image_url )  {
+        $image_quality = get_option( 'pis_api_image_quality' , 0 );
+        // if 0 or less do not add
+        if ( $image_quality <= 0 ) return $image_url;
+        // add quality setting
+        return $image_url . "/quality={$image_quality}";
+    }
     
     /**
      * ratio
@@ -61,7 +80,10 @@ class TwicPics {
      * @return void
      */
     public static function breakpoint_image($image_url , $crop_func , $output = 'webp' ) {
-        return $image_url . "?twic=v1{$crop_func}/output=" . $output;        
+        $image_url = $image_url . "?twic=v1{$crop_func}/output=" . $output;        
+        // apply filters so we can add quality and more if needed
+        return apply_filters( 'perfect_image_sizes/breakpoint_image' , $image_url );
+
     }
     
     /**

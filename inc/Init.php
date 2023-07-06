@@ -24,8 +24,8 @@ class Init {
 
         // add BeaverBuilder replacements
         new BeaverBuilder();
-        new CloudImage();
-        new TwicPics();
+        // new CloudImage();
+        // new TwicPics();
         
         if( ! defined('PIS_ALLOWED_MIME_TYPES') ){
             define( 'PIS_ALLOWED_MIME_TYPES', array( 'image/jpeg', 'image/png', 'image/webp' ) );

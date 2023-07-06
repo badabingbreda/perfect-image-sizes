@@ -187,6 +187,9 @@ class PluginOptions {
                         <option value="cloudimage" <?php selected( $imager, 'cloudimage' )?>>CloudImage</option>
                     </select>
                     <br><br>
+                    <p><?php esc_html_e( 'Set the image quality, 0-100. Lower is smaller file. When changed and cache is enabled you will need to flush to generate new images. Leave empty to use default API quality (optional).', 'perfect-image-sizes' ) ?></p>
+                    <input type="number" name="pis_api_image_quality" value="<?php esc_html_e( get_option( 'pis_api_image_quality' , false )); ?>">
+                    <br><br>
                     <p><?php esc_html_e( 'Provide the API access path. The server image path will be substituted at runtime so that the image will be collected through the API service.', 'perfect-image-sizes' ) ?></p>
                     <input type="text" name="pis_api_access_path" style="width: 100%;" value="<?php esc_html_e( get_option( 'pis_api_access_path' , false )); ?>" placeholder="<?php esc_html_e( 'eg: https://WORKSPACE.twic.pics , https://TOKEN.cloudimg.io/_ALIAS_/' ,'perfect-image-sizes'); ?>">
                     <br><br>
@@ -269,6 +272,15 @@ class PluginOptions {
                 update_option( 'pis_api_access_path' , $access_path );
             } else {
                 delete_option( 'pis_api_access_path' );
+            }
+
+            
+            $image_quality = 0;
+            if ( isset( $_POST[ 'pis_api_image_quality' ])) {
+                $image_quality = intval( $_POST[ 'pis_api_image_quality' ] );
+                update_option( 'pis_api_image_quality' , $image_quality );
+            } else {
+                delete_option( 'pis_api_image_quality' );
             }
 
             $enable_cache = 0;

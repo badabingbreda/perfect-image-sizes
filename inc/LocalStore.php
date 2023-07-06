@@ -62,6 +62,23 @@ class LocalStore {
             wp_mkdir_p( self::$pis_dir );
         }
     }
+        
+    /**
+     * check_attachment_pis_dir
+     * 
+     * check if an attachmentdir exists
+     *
+     * @param  mixed $attachment_id
+     * @return void
+     */
+    public static function check_attachment_pis_dir( $attachment_id = 0 ) {
+        if ( $attachment_id <= 0 ) return false;
+        if( ! is_dir( self::$pis_dir . DIRECTORY_SEPARATOR . $attachment_id ) ){
+            wp_mkdir_p( self::$pis_dir . DIRECTORY_SEPARATOR . $attachment_id );
+        }
+
+        return self::$pis_dir . DIRECTORY_SEPARATOR . $attachment_id;
+    }
     
     /**
      * get_pis_path
@@ -75,6 +92,19 @@ class LocalStore {
         $wp_upload_dir = wp_upload_dir();
         $path = $wp_upload_dir['baseurl'] . str_replace( $wp_upload_dir['basedir'], '', $absolute_path );
         return str_replace( DIRECTORY_SEPARATOR, '/', $path );
+    }
+    
+    /**
+     * get_generated_path
+     * 
+     * return a full pathname for use in self::get_pis_path()
+     *
+     * @param  mixed $attachement_id
+     * @param  mixed $file_name
+     * @return void
+     */
+    public static function get_generated_path( $attachment_id , $file_name ) {
+        return self::$pis_dir . DIRECTORY_SEPARATOR . $attachment_id . DIRECTORY_SEPARATOR . $file_name;
     }
 
     
@@ -187,9 +217,16 @@ class LocalStore {
      * @param  mixed $dest_file_name
      * @return void
      */
-    public static function download_image( $image_url , $dest_file_name ) {
+    public static function download_image( $image_url , $attachment_id , $file_name ) {
+
+        // check if we need to create the attachment subdirectory
+        $path = self::check_attachment_pis_dir( $attachment_id );
+
+        // path fails, return false;
+        if (!$path) return false;
+
         $ch = curl_init( $image_url );
-        $fp = fopen( $dest_file_name , 'wb' );
+        $fp = fopen( $path . DIRECTORY_SEPARATOR . $file_name , 'wb' );
         curl_setopt($ch, CURLOPT_FILE, $fp);
         curl_setopt($ch, CURLOPT_HEADER, 0);
         curl_exec($ch);
@@ -211,7 +248,7 @@ class LocalStore {
 
     public static function attachment_regenerate_button( $form_fields, $post ){
         if( in_array( get_post_mime_type( $post->ID ), PIS_ALLOWED_MIME_TYPES ) ){
-            $url = wp_nonce_url( admin_url( 'options-general.php?page=' . PERFECTIMAGESIZES_BASE . '&delete-pis-image&ids=' . $post->ID ), 'delete_bis_image', 'pis_nonce' );
+            $url = wp_nonce_url( admin_url( 'options-general.php?page=' . PERFECTIMAGESIZES_BASE . '&delete-pis-image&ids=' . $post->ID ), 'delete_pis_image', 'pis_nonce' );
             $form_fields['regenerate_pis_images'] = array(
                 'value' => 1,
                 'label' => __( 'Perfect image sizes', 'perfect-image-sizes' ),

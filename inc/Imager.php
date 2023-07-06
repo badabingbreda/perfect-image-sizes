@@ -1,4 +1,7 @@
 <?php
+
+// https://rudrastyh.com/wordpress/custom-bulk-actions.html
+
 namespace PerfectImageSizes;
 
 use PerfectImageSizes\FocalPoint;
@@ -27,9 +30,81 @@ class Imager {
         // try to make sure this refers to <img src=""> only
         add_filter( 'the_content' , __CLASS__ . '::regex_perfect_image_sizes' , 10 , 1 );
 
+        // add to bulk dropdown
+        add_filter( 'bulk_actions-upload', __CLASS__ . '::add_bulk_action' );
+        // handle our bulk action
+        add_filter( 'handle_bulk_actions-upload', __CLASS__ . '::bulk_action_handler', 10, 3 );
+        // add admin notice if bulk action has been performed
+        add_action( 'admin_notices', __CLASS__ . '::bulk_action_notices' );
+        
         
     }
         
+    /**
+     * add_bulk_actions
+     *
+     * @param  mixed $bulk_array
+     * @return void
+     */
+    public static function add_bulk_action( $bulk_array ) {
+
+        $bulk_array[ 'regenerate_pis_images' ] = 'Regenerate PIS images';
+        return $bulk_array;
+
+    } 
+    
+    public static function bulk_action_handler( $redirect, $do_action, $object_ids ) {
+
+        // let's remove query args first
+        $redirect = remove_query_arg(
+            array( 'bulk_pis_images_removed' ),
+            $redirect
+        );
+    
+        // do something for "Make Draft" bulk action
+        if ( 'regenerate_pis_images' === $do_action ) {
+    
+            foreach ( $object_ids as $post_id ) {
+                LocalStore::delete_attachment_pis_images( $post_id );
+            }
+    
+            // do not forget to add query args to URL because we will show notices later
+            $redirect = add_query_arg(
+                'bulk_pis_images_removed', // just a parameter for URL
+                count( $object_ids ), // how many posts have been selected
+                $redirect
+            );
+    
+        }
+    
+        return $redirect;
+    
+    } 
+    
+    public static function bulk_action_notices() {
+
+        // first of all we have to make a message,
+        // but you can create an awesome message
+        if( ! empty( $_REQUEST[ 'bulk_pis_images_removed' ] ) ) {
+    
+            $count = (int) $_REQUEST[ 'bulk_pis_images_removed' ];
+            // depending on ho much posts were changed, make the message different
+            $message = sprintf(
+                _n(
+                    '%d PIS image has been cleared.',
+                    '%d PIS images have been cleared.',
+                    $count,
+                    'perfect-image-sizes'
+                ),
+                $count
+            );
+    
+            echo "<div class=\"updated notice is-dismissible\"><p>{$message}</p></div>";
+    
+        }
+    
+    }    
+
     /**
      * plugins_loaded
      * 
@@ -294,7 +369,7 @@ class Imager {
             // now that we have a file_name and our breakpoint image,
             // check to see if it already exists. If so, return the full url
             // if not, download the breakpoint image, store under the $file_name and return the full url
-            $generated_file_name = LocalStore::$pis_dir . DIRECTORY_SEPARATOR . $file_name;
+            $generated_file_name = LocalStore::get_generated_path( $attachment_id , $file_name );
             if ( file_exists( $generated_file_name ) ) {
                 $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
             } else {
@@ -303,7 +378,7 @@ class Imager {
                 $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
 
                 // download the optimized image and save to disk
-                LocalStore::download_image( $breakpoint_image , $generated_file_name );
+                LocalStore::download_image( $breakpoint_image , $attachment_id , $file_name );
 
                 // return the url
                 $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
