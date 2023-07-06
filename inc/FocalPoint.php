@@ -4,9 +4,10 @@ namespace PerfectImageSizes;
 class FocalPoint {
     
     public function __construct(){
-        add_filter( 'attachment_fields_to_edit', __CLASS__ . '::focal_point_button' , 10, 2 );
-        add_action( 'edit_attachment', __CLASS__ . '::edit_attachment' );
-        add_action( 'admin_enqueue_scripts', __CLASS__ . '::admin_enqueue_scripts' );
+        add_filter( 'attachment_fields_to_edit',    __CLASS__ . '::focal_point_button' , 10, 2 );
+        add_action( 'edit_attachment',              __CLASS__ . '::edit_attachment' );
+        add_action( 'admin_enqueue_scripts',        __CLASS__ . '::admin_enqueue_scripts' );
+        if ( isset( $_GET[ 'fl_builder' ]) )  add_action( 'wp_enqueue_scripts', __CLASS__ . '::admin_enqueue_scripts' );
     }
     
     /**
@@ -59,7 +60,7 @@ class FocalPoint {
             
             $form_fields['focal_point'] = array(
                 'value' => implode( ';', $focal_point ),
-                'label' => __( 'Focal point', 'perfect-image-sizes' ),
+                'label' => __( 'PIS Focal point', 'perfect-image-sizes' ),
                 'input' => 'html',
                 'html' => $html
             );
