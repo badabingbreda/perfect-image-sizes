@@ -10,6 +10,7 @@ use PerfectImageSizes\Integration\TwicPics;
 class LocalStore {
 
     public static $pis_dir = '';
+    private static $agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/114.0';
 
     public function __construct() {
 
@@ -219,6 +220,7 @@ class LocalStore {
      */
     public static function download_image( $image_url , $attachment_id , $file_name ) {
 
+        
         // check if we need to create the attachment subdirectory
         $path = self::check_attachment_pis_dir( $attachment_id );
 
@@ -228,7 +230,8 @@ class LocalStore {
         $ch = curl_init( $image_url );
         $fp = fopen( $path . DIRECTORY_SEPARATOR . $file_name , 'wb' );
         curl_setopt($ch, CURLOPT_FILE, $fp);
-        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_USERAGENT, self::$agent);
+        curl_setopt($ch, CURLOPT_HTTPHEADER , [ "Accept: image/webp" ] );
         curl_exec($ch);
         curl_close($ch);
         fclose($fp);  

@@ -262,6 +262,19 @@ class Imager {
         $h = $data[1];									// height
         $crop = isset($data[2]) ? $data[2] : false;		// use crop: true/false/'width'/'height'
 
+        // breakpoint ratio to pass into url
+        switch ($data[3]) {
+            case true:
+                $bp_ratio = "{$w}x{$h}";
+            break;
+            case false:
+                $bp_ratio = 'f';
+            break;
+            default:
+                $bp_ratio = $data[3];
+            break;
+        }
+
         // set ratio to resize ratio
         $ratio = (isset( $data[3] ) && $data[3] === true ) ? $imager::ratio($w,$h) : false;
         // if a fractical ratio has been given, use that
@@ -280,7 +293,7 @@ class Imager {
 
         $crop_func = $imager::calc_crop_func( $crop , $w , $h , $gravity , $ratio );
 
-        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , false );
+        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $bp_ratio , $crop_func , false );
         
         $images[] = $breakpoint_image . ' 1x';
 
@@ -296,7 +309,7 @@ class Imager {
                         $crop_func = $imager::calc_crop_func( $crop , $w*1.5 , $h*1.5 , $gravity , $ratio );
                         // $breakpoint_image = $imager::breakpoint_image( $image_url,$crop_func );
                         // $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
-                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , '1.5x' );
+                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $bp_ratio , $crop_func , '1.5x' );
                         $images[] = $breakpoint_image . ' 1.5x';
                     break;
                     case '2x':
@@ -304,7 +317,7 @@ class Imager {
                         $crop_func = $imager::calc_crop_func( $crop , $w*2 , $h*2 , $gravity , $ratio );
                         // $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
                         // $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
-                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , '2x' );
+                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $bp_ratio , $crop_func , '2x' );
                         $images[] = $breakpoint_image . ' 2x';
                     break;
                     case '3x':
@@ -312,7 +325,7 @@ class Imager {
                         $crop_func = $imager::calc_crop_func( $crop , $w*3 , $h*3 , $gravity , $ratio );
                         // $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
                         // $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
-                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , '3x' );
+                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $bp_ratio , $crop_func , '3x' );
                         $images[] = $breakpoint_image . ' 3x';
                     break;
 
@@ -379,7 +392,7 @@ class Imager {
 
                 // download the optimized image and save to disk
                 LocalStore::download_image( $breakpoint_image , $attachment_id , $file_name );
-
+                error_log( $breakpoint_image );
                 // return the url
                 $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
     
