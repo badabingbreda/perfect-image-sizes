@@ -262,6 +262,9 @@ class Imager {
         $h = $data[1];									// height
         $crop = isset($data[2]) ? $data[2] : false;		// use crop: true/false/'width'/'height'
 
+        // set a default value for $data[3]
+        if ( !isset( $data[3] ) ) $data[3] = false;
+
         // breakpoint ratio to pass into url
         switch ($data[3]) {
             case true:
