@@ -4,9 +4,10 @@ namespace PerfectImageSizes;
 class FocalPoint {
     
     public function __construct(){
-        add_filter( 'attachment_fields_to_edit', __CLASS__ . '::attachment_fields_to_edit' , 10, 2 );
-        add_action( 'edit_attachment', __CLASS__ . '::edit_attachment' );
-        add_action( 'admin_enqueue_scripts', __CLASS__ . '::admin_enqueue_scripts' );
+        add_filter( 'attachment_fields_to_edit',    __CLASS__ . '::focal_point_button' , 10, 2 );
+        add_action( 'edit_attachment',              __CLASS__ . '::edit_attachment' );
+        add_action( 'admin_enqueue_scripts',        __CLASS__ . '::admin_enqueue_scripts' );
+        if ( isset( $_GET[ 'fl_builder' ]) )  add_action( 'wp_enqueue_scripts', __CLASS__ . '::admin_enqueue_scripts' );
     }
     
     /**
@@ -20,13 +21,13 @@ class FocalPoint {
     }
 
     /**
-     * attachment_fields_to_edit
+     * focal_point_button
      *
      * @param  mixed $form_fields
      * @param  mixed $post
      * @return void
      */
-    public static function attachment_fields_to_edit( $form_fields, $post ){
+    public static function focal_point_button( $form_fields, $post ){
         if( in_array( get_post_mime_type( $post->ID ), PIS_ALLOWED_MIME_TYPES ) ){
             $focal_point = self::sanitize_focal_point( get_post_meta( $post->ID, 'focal_point', true ) );
             ob_start(); ?>
@@ -59,7 +60,7 @@ class FocalPoint {
             
             $form_fields['focal_point'] = array(
                 'value' => implode( ';', $focal_point ),
-                'label' => __( 'Focal point', 'perfect-image-sizes' ),
+                'label' => __( 'PIS Focal point', 'perfect-image-sizes' ),
                 'input' => 'html',
                 'html' => $html
             );

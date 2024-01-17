@@ -2,6 +2,31 @@
 namespace PerfectImageSizes\Integration;
 
 class CloudImage {
+
+    public function __construct() {
+
+        add_filter( 'perfect_image_sizes/breakpoint_image' , __CLASS__ . '::image_quality' , 10 , 1 );
+        //add_filter( 'perfect_image_sizes/breakpoint_image' , __CLASS__ . '::image_ci_info' , 10 , 1 );
+    }
+        
+    /**
+     * image_quality
+     *
+     * @param  mixed $image_url
+     * @return void
+     */
+    public static function image_quality( $image_url )  {
+        $image_quality = get_option( 'pis_api_image_quality' , 0 );
+        // if 0 or less do not add
+        if ( $image_quality <= 0 ) return $image_url;
+        // add quality setting
+        return $image_url . "&q={$image_quality}";
+    }
+
+    public static function image_ci_info( $image_url ) {
+        return $image_url . '&ci_info=1';
+    }
+
     
     /**
      * ratio
@@ -59,8 +84,10 @@ class CloudImage {
      * @param  mixed $crop_func
      * @return void
      */
-    public static function breakpoint_image($image_url , $crop_func) {
-        return $image_url . "?{$crop_func}";        
+    public static function breakpoint_image($image_url , $crop_func , $output = 'webp,jpeg' ) {
+        $image_url =  $image_url . "?{$crop_func}&force_format=" . $output;
+        // apply filters so we can add quality and more if needed
+        return apply_filters( 'perfect_image_sizes/breakpoint_image' , $image_url );
     }
 
     /**

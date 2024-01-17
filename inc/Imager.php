@@ -1,13 +1,19 @@
 <?php
+
+// https://rudrastyh.com/wordpress/custom-bulk-actions.html
+
 namespace PerfectImageSizes;
 
 use PerfectImageSizes\FocalPoint;
+use PerfectImageSizes\LocalStore;
 use PerfectImageSizes\Integration\CloudImage;
 use PerfectImageSizes\Integration\TwicPics;
 
 class Imager {
 
     private static $imager;
+
+    private static $enable_cache = false;
 
     public function __construct() {
         // maybe change the imager on plugins loaded
@@ -24,9 +30,81 @@ class Imager {
         // try to make sure this refers to <img src=""> only
         add_filter( 'the_content' , __CLASS__ . '::regex_perfect_image_sizes' , 10 , 1 );
 
+        // add to bulk dropdown
+        add_filter( 'bulk_actions-upload', __CLASS__ . '::add_bulk_action' );
+        // handle our bulk action
+        add_filter( 'handle_bulk_actions-upload', __CLASS__ . '::bulk_action_handler', 10, 3 );
+        // add admin notice if bulk action has been performed
+        add_action( 'admin_notices', __CLASS__ . '::bulk_action_notices' );
+        
         
     }
         
+    /**
+     * add_bulk_actions
+     *
+     * @param  mixed $bulk_array
+     * @return void
+     */
+    public static function add_bulk_action( $bulk_array ) {
+
+        $bulk_array[ 'regenerate_pis_images' ] = 'Regenerate PIS images';
+        return $bulk_array;
+
+    } 
+    
+    public static function bulk_action_handler( $redirect, $do_action, $object_ids ) {
+
+        // let's remove query args first
+        $redirect = remove_query_arg(
+            array( 'bulk_pis_images_removed' ),
+            $redirect
+        );
+    
+        // do something for "Make Draft" bulk action
+        if ( 'regenerate_pis_images' === $do_action ) {
+    
+            foreach ( $object_ids as $post_id ) {
+                LocalStore::delete_attachment_pis_images( $post_id );
+            }
+    
+            // do not forget to add query args to URL because we will show notices later
+            $redirect = add_query_arg(
+                'bulk_pis_images_removed', // just a parameter for URL
+                count( $object_ids ), // how many posts have been selected
+                $redirect
+            );
+    
+        }
+    
+        return $redirect;
+    
+    } 
+    
+    public static function bulk_action_notices() {
+
+        // first of all we have to make a message,
+        // but you can create an awesome message
+        if( ! empty( $_REQUEST[ 'bulk_pis_images_removed' ] ) ) {
+    
+            $count = (int) $_REQUEST[ 'bulk_pis_images_removed' ];
+            // depending on ho much posts were changed, make the message different
+            $message = sprintf(
+                _n(
+                    '%d PIS image has been cleared.',
+                    '%d PIS images have been cleared.',
+                    $count,
+                    'perfect-image-sizes'
+                ),
+                $count
+            );
+    
+            echo "<div class=\"updated notice is-dismissible\"><p>{$message}</p></div>";
+    
+        }
+    
+    }    
+
     /**
      * plugins_loaded
      * 
@@ -36,8 +114,31 @@ class Imager {
      */
     public static function plugins_loaded() {
         
-        $use_imager = apply_filters( 'perfect_image_sizes/imager' , 'twicpics' );
-    
+        // try to get the settings from the options table, fallback to twicpics if none selected
+        $imager = get_option( 'pis_imager' , 'twicpics' );
+
+        // legact filter
+        $use_imager = apply_filters( 'perfect_image_sizes/imager' , $imager );
+
+        // set the imageurl replacement using our generic setting
+        $api_access_path = get_option( 'pis_api_access_path' , '' );
+
+        if ( $api_access_path ) {
+            add_filter( 'perfect_image_sizes/imageurl' , 
+            function( $name ) use ( $api_access_path ) {
+                $uploads_dir = wp_upload_dir();
+                return str_replace( $uploads_dir[ 'baseurl' ] , $api_access_path , $name ) ;
+            } , 10 , 1 ) ;
+        }
+
+
+        self::$enable_cache = get_option( 'pis_enable_cache' , false );
+
+        if ( self::$enable_cache ) {
+            // figure this out later
+
+        }
+
         switch( $use_imager ) {
             case "twicpics":
                 self::$imager = new TwicPics();
@@ -60,6 +161,7 @@ class Imager {
      */
     public static function get_attachment_picture( $attachment_id , $breakpoints = null , $attr = array() , $max_full = null , $identifier = null ) {
 
+        $html = '';
 		// let the hooks handle this
 		return apply_filters( 'perfect_get_attachment_picture', $html, $attachment_id, $breakpoints, $attr , $max_full , $identifier );
     }
@@ -107,7 +209,8 @@ class Imager {
 
         // get the metadata
         $metadata = wp_get_attachment_metadata( $attachment_id );
-        list( $width , $height ) = $metadata;
+        $width = $metadata['width'];
+        $height = $metadata[ 'height' ];
 
 
         // if max full size has been given
@@ -159,6 +262,22 @@ class Imager {
         $h = $data[1];									// height
         $crop = isset($data[2]) ? $data[2] : false;		// use crop: true/false/'width'/'height'
 
+        // set a default value for $data[3]
+        if ( !isset( $data[3] ) ) $data[3] = false;
+
+        // breakpoint ratio to pass into url
+        switch ($data[3]) {
+            case true:
+                $bp_ratio = "{$w}x{$h}";
+            break;
+            case false:
+                $bp_ratio = 'f';
+            break;
+            default:
+                $bp_ratio = $data[3];
+            break;
+        }
+
         // set ratio to resize ratio
         $ratio = (isset( $data[3] ) && $data[3] === true ) ? $imager::ratio($w,$h) : false;
         // if a fractical ratio has been given, use that
@@ -176,8 +295,9 @@ class Imager {
         }
 
         $crop_func = $imager::calc_crop_func( $crop , $w , $h , $gravity , $ratio );
-        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+
+        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $bp_ratio , $crop_func , false );
+        
         $images[] = $breakpoint_image . ' 1x';
 
         if (isset($data[4]) && is_array($data[4])) {
@@ -190,22 +310,25 @@ class Imager {
                     case '1.5x':
                         if ($w*1.5 > $metadata['width'] || $h*1.5 > $metadata['height']) break;
                         $crop_func = $imager::calc_crop_func( $crop , $w*1.5 , $h*1.5 , $gravity , $ratio );
-                        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+                        // $breakpoint_image = $imager::breakpoint_image( $image_url,$crop_func );
+                        // $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
+                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $bp_ratio , $crop_func , '1.5x' );
                         $images[] = $breakpoint_image . ' 1.5x';
                     break;
                     case '2x':
                         if ($w*2 > $metadata['width'] || $h*2 > $metadata['height']) break;
                         $crop_func = $imager::calc_crop_func( $crop , $w*2 , $h*2 , $gravity , $ratio );
-                        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+                        // $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
+                        // $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
+                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $bp_ratio , $crop_func , '2x' );
                         $images[] = $breakpoint_image . ' 2x';
                     break;
                     case '3x':
                         if ($w*3 > $metadata['width'] || $h*3 > $metadata['height']) break;
                         $crop_func = $imager::calc_crop_func( $crop , $w*3 , $h*3 , $gravity , $ratio );
-                        $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
-                        $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image ); 
+                        // $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func);
+                        // $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func ); 
+                        $breakpoint_image = self::get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $bp_ratio , $crop_func , '3x' );
                         $images[] = $breakpoint_image . ' 3x';
                     break;
 
@@ -217,6 +340,74 @@ class Imager {
         $images = apply_filters( 'perfect_image_sizes/imageurl/after' , $images , $attachment_id , $data , $size , $identifier );
 
         return implode( ', ', $images );
+    }
+    
+    /**
+     * get_breakpoint_image
+     * 
+     * get the image url, taking into consideration if cache needs to be used
+     *
+     * @param  mixed $attachment_id
+     * @param  mixed $w
+     * @param  mixed $h
+     * @param  mixed $crop
+     * @param  mixed $focal_x_p
+     * @param  mixed $focal_y_p
+     * @param  mixed $ratio
+     * @param  mixed $crop_func
+     * @param  mixed $retina
+     * @return void
+     */
+    private static function get_breakpoint_image( $attachment_id , $w , $h , $crop , $focal_x_p , $focal_y_p , $ratio , $crop_func , $retina = false ) {
+
+        $imager = self::$imager;
+
+        // get full image source url
+        $image_url = wp_get_attachment_image_url( $attachment_id, 'full', false );
+
+        // get pis full name
+        if ( self::$enable_cache ) {
+            // get the image metadata
+            $image = wp_get_attachment_metadata( $attachment_id );
+
+            // generate a filename that we will use to store this size
+            $file_name = LocalStore::get_pis_full_name( 
+                    basename( $image['file'] ) , 
+                    [ 
+                        'w' => $w , 
+                        'h' => $h , 
+                        'crop' => $crop , 
+                        'gravity' => (isset( $focal_x_p ) ? $focal_x_p . 'x' . $focal_y_p : false) , 
+                        'ratio' => $ratio , 
+                        'retina' => $retina 
+                        ] );
+
+            // now that we have a file_name and our breakpoint image,
+            // check to see if it already exists. If so, return the full url
+            // if not, download the breakpoint image, store under the $file_name and return the full url
+            $generated_file_name = LocalStore::get_generated_path( $attachment_id , $file_name );
+            if ( file_exists( $generated_file_name ) ) {
+                $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
+            } else {
+                // generate the url that will get our optimized image
+                $breakpoint_image = $imager::breakpoint_image( $image_url, $crop_func , 'webp' );
+                $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
+
+                // download the optimized image and save to disk
+                LocalStore::download_image( $breakpoint_image , $attachment_id , $file_name );
+                error_log( $breakpoint_image );
+                // return the url
+                $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
+    
+            }
+            
+        } else {
+            $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func, 'webp');
+            $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
+        }
+
+        return $breakpoint_image;
+
     }
 
     /**
@@ -277,7 +468,7 @@ class Imager {
         foreach($sources as &$source) {
             if(!file_exists($source['url'])) 
             {
-                $source['url'] = apply_filters( 'perfect_image_sizes/imageurl' ,  $source['url']);
+                $source['url'] = apply_filters( 'perfect_image_sizes/imageurl' ,  $source['url'] );
             }
         }
         return $sources;
