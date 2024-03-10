@@ -109,7 +109,7 @@ class TwicPics {
 
 		foreach( $attr as $name => $value ){
             if( $name === 'lqip' && $value === true ) {
-                $html .= " style=\"object-fit:cover;background-size:cover;background-image: url({$image}?twic=v1/width=100/output=preview);'\"";
+                $html .= " style=\"object-fit:cover;background-size:cover;background-image: url({$image}?twic=v1/resize=100/output=preview);'\"";
                 $html .= " data-twic-background=\"url(" .str_replace( $source, "" , $image_url ). ")\"";
                 continue;
             }
