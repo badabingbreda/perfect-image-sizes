@@ -395,7 +395,6 @@ class Imager {
 
                 // download the optimized image and save to disk
                 LocalStore::download_image( $breakpoint_image , $attachment_id , $file_name );
-                error_log( $breakpoint_image );
                 // return the url
                 $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
     
