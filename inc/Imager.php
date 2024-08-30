@@ -18,6 +18,8 @@ class Imager {
     public function __construct() {
         // maybe change the imager on plugins loaded
         add_action( 'plugins_loaded' , __CLASS__ . '::plugins_loaded' );
+
+        add_filter( 'perfect_image_sizes/imageurl' , __CLASS__ . '::replace_image_url' , 10 , 2 );
         
         add_filter( 'perfect_get_attachment_picture' , __CLASS__ . '::get_imager' , 10 , 6 );
 
@@ -36,8 +38,14 @@ class Imager {
         add_filter( 'handle_bulk_actions-upload', __CLASS__ . '::bulk_action_handler', 10, 3 );
         // add admin notice if bulk action has been performed
         add_action( 'admin_notices', __CLASS__ . '::bulk_action_notices' );
+
+        // Action hook for the 
+        add_action( 'pis_scheduled_localstore_image' , __CLASS__ . '::pis_localstore_image_download' , 10 , 3 );
         
-        
+    }
+
+    public static function get_cache_enabled() {
+        return self::$enable_cache;
     }
         
     /**
@@ -117,20 +125,8 @@ class Imager {
         // try to get the settings from the options table, fallback to twicpics if none selected
         $imager = get_option( 'pis_imager' , 'twicpics' );
 
-        // legact filter
+        // legacy filter
         $use_imager = apply_filters( 'perfect_image_sizes/imager' , $imager );
-
-        // set the imageurl replacement using our generic setting
-        $api_access_path = get_option( 'pis_api_access_path' , '' );
-
-        if ( $api_access_path ) {
-            add_filter( 'perfect_image_sizes/imageurl' , 
-            function( $name ) use ( $api_access_path ) {
-                $uploads_dir = wp_upload_dir();
-                return str_replace( $uploads_dir[ 'baseurl' ] , $api_access_path , $name ) ;
-            } , 10 , 1 ) ;
-        }
-
 
         self::$enable_cache = get_option( 'pis_enable_cache' , false );
 
@@ -150,6 +146,19 @@ class Imager {
     
         }
     }
+
+    public static function replace_image_url( $name , $crop_func = false ) {
+        // set the imageurl replacement using our generic setting
+        $api_access_path = get_option( 'pis_api_access_path' , false );
+
+        if ( !$api_access_path ) return $name;
+
+        // when set to use local cache, serve local files
+        //if ( self::$enable_cache ) return $name;
+        $uploads_dir = wp_upload_dir();
+        return str_replace( $uploads_dir[ 'baseurl' ] , $api_access_path , $name ) ;
+    }
+
     
     /**
      * get_attachment_picture
@@ -386,17 +395,29 @@ class Imager {
             // check to see if it already exists. If so, return the full url
             // if not, download the breakpoint image, store under the $file_name and return the full url
             $generated_file_name = LocalStore::get_generated_path( $attachment_id , $file_name );
+
             if ( file_exists( $generated_file_name ) ) {
                 $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
             } else {
+
                 // generate the url that will get our optimized image
                 $breakpoint_image = $imager::breakpoint_image( $image_url, $crop_func , 'webp' );
                 $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
+                
+                // check if action scheduler is activated
+                // only enqueue the download for a later time and keep serving the CDN for now
+                if ( \function_exists( 'as_has_scheduled_action' )) {
 
-                // download the optimized image and save to disk
-                LocalStore::download_image( $breakpoint_image , $attachment_id , $file_name );
-                // return the url
-                $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
+                    self::schedule_download( $breakpoint_image , $attachment_id , $file_name );
+
+                // action scheduler is not enabled
+                } else {
+
+                    // download the optimized image and save to disk
+                    LocalStore::download_image( $breakpoint_image , $attachment_id , $file_name );
+                    // return the url
+                    $breakpoint_image = LocalStore::get_pis_path( $generated_file_name );
+                }
     
             }
             
@@ -404,24 +425,62 @@ class Imager {
             $breakpoint_image = $imager::breakpoint_image($image_url,$crop_func, 'webp');
             $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
         }
-
         return $breakpoint_image;
 
+    }
+    
+    /**
+     * schedule_download
+     *
+     * @param  mixed $breakpoint_image
+     * @param  mixed $attachment_id
+     * @param  mixed $file_name
+     * @return void
+     */
+    private static function schedule_download( $breakpoint_image , $attachment_id , $file_name ) {
+
+        if ( !\as_has_scheduled_action( 
+            'pis_scheduled_localstore_image', 
+            [ 'breakpoint_image' => $breakpoint_image , 'attachment_id' => $attachment_id , 'file_name' => $file_name ]
+        )) {
+            \as_schedule_single_action( 
+                time(),
+                'pis_scheduled_localstore_image',
+                [ 'breakpoint_image' => $breakpoint_image , 'attachment_id' => $attachment_id , 'file_name' => $file_name ]
+            );
+            
+        }
+    }
+    
+    /**
+     * pis_localstore_image_download
+     * 
+     * this should trigger a download action and update imagedata
+     *
+     * @param  mixed $settings
+     * @return void
+     */
+    public static function pis_localstore_image_download( $breakpoint_image , $attachment_id , $file_name  ) {
+
+        // download the optimized image and save to disk
+        LocalStore::download_image( $breakpoint_image , $attachment_id , $file_name );
     }
 
     /**
      * attachment_url
      * 
-     * replace url with cloudimage.io path
+     * replace url with cdn imager path
      *
      * @param  mixed $url
      * @return void
      */
     public static function attachment_url($url) {
+        if ( self::$enable_cache == true ) return $url;
         if (is_admin()) return $url;
         if (file_exists($url)) {
             return $url;
         }
+
         return apply_filters( 'perfect_image_sizes/imageurl' , $url );
     }
     
@@ -432,7 +491,8 @@ class Imager {
      * @return void
      */
     public static function regex_perfect_image_sizes( $content ) {
-
+        if (is_admin()) return $content;
+        if ( self::$enable_cache == true ) return $content;
         if ( !apply_filters( 'perfect_image_sizes/the_content' , false ) ) return $content;
 
         // use the uploads dir

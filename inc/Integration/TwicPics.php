@@ -108,8 +108,8 @@ class TwicPics {
         $image = apply_filters( 'perfect_image_sizes/imageurl', $image_url );
 
 		foreach( $attr as $name => $value ){
-            if( $name === 'lqip' && $value === true ) {
-                $html .= " style=\"object-fit:cover;background-size:cover;background-image: url({$image}?twic=v1/resize=100/output=preview);'\"";
+            if( $name === 'lqip' && $value === true && !Imager::get_cache_enabled() ) {
+                $html .= " style=\"object-fit:cover;background-size:cover;background-image: url({$image}?twic=v1/resize=100/output=preview);\"";
                 $html .= " data-twic-background=\"url(" .str_replace( $source, "" , $image_url ). ")\"";
                 continue;
             }
