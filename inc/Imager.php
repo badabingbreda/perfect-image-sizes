@@ -20,7 +20,11 @@ class Imager {
         add_action( 'plugins_loaded' , __CLASS__ . '::plugins_loaded' );
 
         add_filter( 'perfect_image_sizes/imageurl' , __CLASS__ . '::replace_image_url' , 10 , 2 );
-        
+        add_filter( 'perfect_image_sizes/imageurl' , __CLASS__ . '::serve_original_from_pis_cache' , 20 , 1 );
+
+        // filter to pass current url to imager path
+        add_filter( 'perfect_image_sizes/url_to_imager' , __CLASS__ . '::url_to_imager' , 10, 2 );
+
         add_filter( 'perfect_get_attachment_picture' , __CLASS__ . '::get_imager' , 10 , 6 );
 
         // replace attachement urls
@@ -153,10 +157,72 @@ class Imager {
 
         if ( !$api_access_path ) return $name;
 
+        if ( self::$enable_cache ) return $name;
+
         // when set to use local cache, serve local files
         //if ( self::$enable_cache ) return $name;
         $uploads_dir = wp_upload_dir();
         return str_replace( $uploads_dir[ 'baseurl' ] , $api_access_path , $name ) ;
+    }
+
+    public static function url_to_imager( $name , $crop_func = false ) {
+        // set the imageurl replacement using our generic setting
+        $api_access_path = get_option( 'pis_api_access_path' , false );
+
+        if ( !$api_access_path ) return $name;
+        // when set to use local cache, serve local files
+        //if ( self::$enable_cache ) return $name;
+        $uploads_dir = wp_upload_dir();
+        return str_replace( $uploads_dir[ 'baseurl' ] , $api_access_path , $name ) ;
+    }
+
+
+    public static function serve_original_from_pis_cache( $imageurl ) {
+
+        if ( !self::$enable_cache ) return $imageurl;
+
+        $imager = self::$imager;
+        $uploads_dir = wp_upload_dir();
+
+        if ( strpos($imageurl , $uploads_dir['baseurl'] ) === 0) {
+
+            // get the attachment id
+            $attachment_id = attachment_url_to_postid( $imageurl );
+            if ( $attachment_id ) {
+                // get filename
+                $file_name = basename( $imageurl );
+                $generated_file_name = LocalStore::get_generated_path( $attachment_id , $file_name );
+
+                if ( file_exists( $generated_file_name ) ) {
+                    $imageurl = LocalStore::get_pis_path( $generated_file_name );
+                } else {
+    
+                    // generate the url that will get our optimized image
+                    $imageurl = $imager::breakpoint_image( $imageurl, '' , 'webp' );
+                    $imageurl = apply_filters( 'perfect_image_sizes/url_to_imager' , $imageurl , '' );
+                    
+                    // check if action scheduler is activated
+                    // only enqueue the download for a later time and keep serving the CDN for now
+                    if ( \function_exists( 'as_has_scheduled_action' )) {
+    
+                        self::schedule_download( $imageurl , $attachment_id , $file_name );
+    
+                    // action scheduler is not enabled
+                    } else {
+    
+                        // download the optimized image and save to disk
+                        LocalStore::download_image( $imageurl , $attachment_id , $file_name );
+                        // return the url
+                        $imageurl = LocalStore::get_pis_path( $generated_file_name );
+                    }
+        
+                }
+            } else {
+                return $imageurl;
+            }
+        }
+
+        return $imageurl;
     }
 
     
@@ -402,7 +468,7 @@ class Imager {
 
                 // generate the url that will get our optimized image
                 $breakpoint_image = $imager::breakpoint_image( $image_url, $crop_func , 'webp' );
-                $breakpoint_image = apply_filters( 'perfect_image_sizes/imageurl' , $breakpoint_image , $crop_func );
+                $breakpoint_image = apply_filters( 'perfect_image_sizes/url_to_imager' , $breakpoint_image , $crop_func );
                 
                 // check if action scheduler is activated
                 // only enqueue the download for a later time and keep serving the CDN for now
