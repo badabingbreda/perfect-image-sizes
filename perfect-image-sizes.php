@@ -52,10 +52,16 @@ if ( ! class_exists( 'PerfectImageSizes\Init' ) ) {
 
 	$better_image_sizes = new Init();
 
+	require_once 'badabing-updater.php';
+
+	new Badabing\Updater('https://update.badabing.nl' , __FILE__ , 'c8Jafd8um54MVGt' );
+
 	if (!function_exists( 'perfect_get_picture' )) {
 		function perfect_get_picture( $attachment_id , $breakpoints , $attr , $max_full = null ) {
 			return Imager::get_attachment_picture( $attachment_id , $breakpoints , $attr , $max_full );
 		}
 	}
+
+
 
 }
