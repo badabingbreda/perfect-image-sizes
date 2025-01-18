@@ -256,7 +256,7 @@ class Imager {
         
         $imager = self::$imager;
 
-        if( $attachment_id < 1 || !is_array( $breakpoints ) || count( $breakpoints ) === 0 ){
+        if( $attachment_id < 1 || !is_array( $breakpoints ) ){
 			return $html;
 		}
         // sort the sizes
