@@ -26,7 +26,7 @@ if ( defined( 'ABSPATH' ) && ! defined( 'PERFECTIMAGESIZES_VERION' ) ) {
 		}
 	}
 	
-	define( 'PERFECTIMAGESIZES_VERSION'   , '1.4.2' );
+	define( 'PERFECTIMAGESIZES_VERSION'   , '1.6.0' );
 	define( 'PERFECTIMAGESIZES_DIR'     , plugin_dir_path( __FILE__ ) );
 	define( 'PERFECTIMAGESIZES_BASE'     , plugin_basename( __FILE__ ) );
 	define( 'PERFECTIMAGESIZES_FILE'    , __FILE__ );
