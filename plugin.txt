@@ -2,6 +2,6 @@
 PluginName: Perfect Image Sizes
 ZipName: perfect-image-sizes
 Description: Perfect Image Sizes Plugin
-Version: 1.4.2
+Version: 1.6.0
 Author: Badabing Breda
 AuthorURI: https://www.badabing.nl

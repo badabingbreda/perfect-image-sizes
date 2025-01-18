@@ -25,7 +25,7 @@ class Imager {
         // filter to pass current url to imager path
         add_filter( 'perfect_image_sizes/url_to_imager' , __CLASS__ . '::url_to_imager' , 10, 2 );
 
-        add_filter( 'perfect_get_attachment_picture' , __CLASS__ . '::get_imager' , 10 , 6 );
+        add_filter( 'perfect_get_attachment_picture' , __CLASS__ . '::get_imager' , 10 , 7 );
 
         // replace attachement urls
         add_filter( 'wp_get_attachment_url', __CLASS__ . '::attachment_url' , 10, 1 );
@@ -234,11 +234,11 @@ class Imager {
      * @param  mixed $attr
      * @return void
      */
-    public static function get_attachment_picture( $attachment_id , $breakpoints = null , $attr = array() , $max_full = null , $identifier = null ) {
+    public static function get_attachment_picture( $attachment_id , $breakpoints = null , $attr = array() , $max_full = null , $identifier = null , $wrap = true ) {
 
         $html = '';
 		// let the hooks handle this
-		return apply_filters( 'perfect_get_attachment_picture', $html, $attachment_id, $breakpoints, $attr , $max_full , $identifier );
+		return apply_filters( 'perfect_get_attachment_picture', $html, $attachment_id, $breakpoints, $attr , $max_full , $identifier , $wrap );
     }
     
     /**
@@ -250,8 +250,10 @@ class Imager {
      * @param  mixed $attr
      * @return void
      */
-    public static function get_imager( $html , $attachment_id , $breakpoints , $attr , $max_full , $identifier ) {
+    public static function get_imager( $html , $attachment_id , $breakpoints , $attr , $max_full , $identifier , $wrap ) {
 
+        $max_image = false;
+        
         $imager = self::$imager;
 
         if( $attachment_id < 1 || !is_array( $breakpoints ) || count( $breakpoints ) === 0 ){
@@ -261,7 +263,7 @@ class Imager {
 		ksort( $breakpoints );
 
 
-        $html .= "<picture>";
+        if ( $wrap ) $html .= "<picture>";
 
 		$last_breakpoint = 0;        
 
@@ -290,23 +292,26 @@ class Imager {
 
         // if max full size has been given
         if ( is_array($max_full) && count($max_full) >= 2 ) {
-
-            $max_image = self::get_image_url( $attachment_id , $max_full , 'max_full' , $identifier );
+            $max_image = self::get_image_url( $attachment_id , $max_full , 'full' , $identifier );
             $attr = array_merge( array( 'width' => $max_full[0] , 'height' => $max_full[1] ) , $attr );
+        } elseif ( is_string( $max_full)) {
+            $max_image = $max_full;
         } else {
-            $max_image = self::get_image_url($attachment_id , null , 'original' , $identifier );
+            $max_image = self::get_image_url($attachment_id , null , 'full' , $identifier );
             $attr = array_merge( array( 'width' => $width , 'height' => $height ) , $attr );
         }
 
         $html .= "<source media=\"(min-width:". ($last_breakpoint + 1) . "px)\" srcset=\"{$max_image}\">";
 
-        $full_image = self::get_image_url($attachment_id , null , 'original' , $identifier );
+        $full_image = self::get_image_url($attachment_id , null , 'full' , $identifier );
+
+        if ( $max_image ) $full_image = $max_image;
 
         $html .= "<img src=\"{$full_image}\"";
         $html .= $imager::img_attr($attr,$attachment_id);
 		$html .= ' />';		
 
-        $html .= "</picture>";
+        if ( $wrap ) $html .= "</picture>";
 
         return $html;
 
@@ -324,9 +329,11 @@ class Imager {
         $imager = self::$imager;
 
         $images = [];
+
+        if ( isset($data[5])) $size = $data[5];
         
         // get full image source url
-        $image_url = wp_get_attachment_image_url( $attachment_id, 'full', false );
+        $image_url = wp_get_attachment_image_url( $attachment_id, $size, false );
 
         if (!$image_url) return false;
 

@@ -8,8 +8,14 @@ class FocalPoint {
         add_action( 'edit_attachment',              __CLASS__ . '::edit_attachment' );
         add_action( 'admin_enqueue_scripts',        __CLASS__ . '::admin_enqueue_scripts' );
         if ( isset( $_GET[ 'fl_builder' ]) )  add_action( 'wp_enqueue_scripts', __CLASS__ . '::admin_enqueue_scripts' );
+        add_action( 'init' , __CLASS__ . '::on_init' );
     }
-    
+
+    public static function on_init() {
+        if ( function_exists( 'bricks_is_builder' ) && bricks_is_builder_main() ) {
+            add_action( 'wp_enqueue_scripts', __CLASS__ . '::admin_enqueue_scripts' );
+        }
+    }
     /**
      * admin_enqueue_scripts
      *
